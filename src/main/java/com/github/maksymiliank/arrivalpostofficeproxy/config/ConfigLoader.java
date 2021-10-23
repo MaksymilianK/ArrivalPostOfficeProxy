@@ -1,5 +1,6 @@
 package com.github.maksymiliank.arrivalpostofficeproxy.config;
 
+import com.github.maksymiliank.arrivalwebsocketutils.WebSocketAddress;
 import net.md_5.bungee.config.Configuration;
 import net.md_5.bungee.config.ConfigurationProvider;
 import net.md_5.bungee.config.YamlConfiguration;
@@ -109,8 +110,7 @@ public class ConfigLoader {
         var section = config.getSection(ALLOWED_MC_SERVERS_PATH).getSection(name);
         return new McServer(
                 section.getInt(MC_SERVER_ID),
-                section.getString(MC_SERVER_HOST),
-                section.getInt(MC_SERVER_PORT)
+                new WebSocketAddress(section.getString(MC_SERVER_HOST), section.getInt(MC_SERVER_PORT))
         );
     }
 }

@@ -3,7 +3,7 @@ plugins {
 }
 
 group 'com.github.maksymiliank'
-version '0.1'
+version '1.0'
 
 repositories {
     mavenCentral()
@@ -15,6 +15,7 @@ repositories {
 dependencies {
     implementation fileTree(dir: 'libs', include: '*.jar')
     implementation 'io.github.waterfallmc:waterfall-api:1.17-R0.1-SNAPSHOT'
+    implementation "org.java-websocket:Java-WebSocket:1.5.2"
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     testImplementation 'org.assertj:assertj-core:3.21.0'
