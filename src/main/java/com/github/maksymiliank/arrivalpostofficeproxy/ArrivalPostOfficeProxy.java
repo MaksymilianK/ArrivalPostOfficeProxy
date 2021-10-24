@@ -3,6 +3,7 @@ package com.github.maksymiliank.arrivalpostofficeproxy;
 import com.github.maksymiliank.arrivalpostofficeproxy.config.Config;
 import com.github.maksymiliank.arrivalpostofficeproxy.config.ConfigLoader;
 import com.github.maksymiliank.arrivalwebsocketutils.*;
+import com.google.gson.JsonObject;
 import net.md_5.bungee.api.plugin.Plugin;
 
 import java.util.HashMap;
@@ -22,11 +23,11 @@ public class ArrivalPostOfficeProxy extends Plugin {
         startServer(config);
     }
 
-    public static void addApiListener(int messageType, Consumer<InboundMessage> onMessage) {
+    public static void addApiListener(int messageType, Consumer<JsonObject> onMessage) {
         client.addListener(messageType, onMessage);
     }
 
-    public static void addMcServerListener(int messageType, BiConsumer<Integer, InboundMessage> onMessage) {
+    public static void addMcServerListener(int messageType, BiConsumer<Integer, JsonObject> onMessage) {
         server.addListener(messageType, onMessage);
     }
 
@@ -43,10 +44,12 @@ public class ArrivalPostOfficeProxy extends Plugin {
                 new WebSocketAddress(config.apiHost(), config.apiPort()),
                 getSLF4JLogger()
         );
+        client.connect();
 
         getProxy().getScheduler().schedule(
                 this,
                 this::tryReconnectClient,
+                config.apiReconnectPeriod(),
                 config.apiReconnectPeriod(),
                 TimeUnit.SECONDS
         );
@@ -57,11 +60,13 @@ public class ArrivalPostOfficeProxy extends Plugin {
         config.allowedMcServers().forEach(s -> allowedClients.put(s.address(), s.id()));
 
         server = new ArrivalWebsocketServer(config.port(), getSLF4JLogger(), allowedClients);
+        server.start();
     }
 
     private void tryReconnectClient() {
         if (!client.isOpen()) {
             client.reconnect();
+            getSLF4JLogger().info("Trying to reconnect to API");
         }
     }
 }
