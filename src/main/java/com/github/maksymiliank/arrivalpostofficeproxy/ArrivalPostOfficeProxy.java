@@ -3,6 +3,7 @@ package com.github.maksymiliank.arrivalpostofficeproxy;
 import com.github.maksymiliank.arrivalpostofficeproxy.config.Config;
 import com.github.maksymiliank.arrivalpostofficeproxy.config.ConfigLoader;
 import com.github.maksymiliank.arrivalwebsocketutils.*;
+import com.github.maksymiliank.arrivalwebsocketutils.message.OutboundMessage;
 import com.google.gson.JsonObject;
 import net.md_5.bungee.api.plugin.Plugin;
 
@@ -12,6 +13,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class ArrivalPostOfficeProxy extends Plugin {
+
+    public static final int PROXY_SERVER_ID = -1;
 
     private static ArrivalWebsocketServer server;
     private static ArrivalWebsocketClient client;
