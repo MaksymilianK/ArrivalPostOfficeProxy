@@ -2,51 +2,84 @@ package com.github.maksymiliank.arrivalpostofficeproxy;
 
 import com.github.maksymiliank.arrivalpostofficeproxy.config.Config;
 import com.github.maksymiliank.arrivalpostofficeproxy.config.ConfigLoader;
-import com.github.maksymiliank.arrivalwebsocketutils.*;
-import com.github.maksymiliank.arrivalwebsocketutils.message.OutboundMessage;
-import com.google.gson.JsonObject;
+import com.github.maksymiliank.arrivalpostofficeproxy.websocket.ArrivalWebsocketClient;
+import com.github.maksymiliank.arrivalpostofficeproxy.websocket.ArrivalWebsocketServer;
+import com.github.maksymiliank.arrivalpostofficeproxy.websocket.WebSocketAddress;
+import com.github.maksymiliank.arrivalpostofficeproxy.websocket.message.Message;
+import com.github.maksymiliank.arrivalpostofficeproxy.websocket.message.RawMessage;
+import com.github.maksymiliank.arrivalpostofficeproxy.websocket.message.RawMessageDeserializer;
+import com.google.gson.GsonBuilder;
 import net.md_5.bungee.api.plugin.Plugin;
 
-import java.util.HashMap;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class ArrivalPostOfficeProxy extends Plugin {
 
-    public static final int PROXY_SERVER_ID = -1;
+    private ArrivalWebsocketClient client;
+    private ArrivalWebsocketServer server;
 
-    private static ArrivalWebsocketServer server;
-    private static ArrivalWebsocketClient client;
+    private ApiPostman apiPostman;
+    private McPostman mcPostman;
 
     @Override
     public void onEnable() {
         var config = ConfigLoader.load(getDataFolder());
+
         startClient(config);
         startServer(config);
     }
 
-    public static void addApiListener(int messageType, Consumer<JsonObject> onMessage) {
-        client.addListener(messageType, onMessage);
+    @Override
+    public void onDisable() {
+        try {
+            server.stop();
+        } catch (InterruptedException e) {
+            getSLF4JLogger().warn("Interrupted stopping server");
+        }
+
+        client.close();
     }
 
-    public static void addMcServerListener(int messageType, BiConsumer<Integer, JsonObject> onMessage) {
-        server.addListener(messageType, onMessage);
+    public void addApiListener(int messageType, Class<? extends Message> messageClass, Consumer<Message> onMessage) {
+        apiPostman.addListener(messageType, messageClass, onMessage);
     }
 
-    public static void sendToApi(OutboundMessage message) {
-        client.send(message);
+    public void sendToApi(Message message) {
+        apiPostman.send(message);
     }
 
-    public static void sendToMcServer(OutboundMessage message) {
-        client.send(message);
+    public Optional<Message> sendToApiBlocking(Message message, int responseType,
+                                               Class<? extends Message> responseClass) {
+        return apiPostman.sendBlocking(message, responseType, responseClass);
+    }
+
+    public void addMcListener(int messageType, Class<? extends Message> messageClass, Consumer<Message> onMessage) {
+        mcPostman.addListener(messageType, messageClass, onMessage);
+    }
+
+    public void sendToMc(String mcServer, Message message) {
+        mcPostman.send(mcServer, message);
+    }
+
+    public Optional<Message> sendToMcBlocking(String mcServer, Message message, int responseType,
+                                              Class<? extends Message> responseClass) {
+        return mcPostman.sendBlocking(mcServer, message, responseType, responseClass);
     }
 
     private void startClient(Config config) {
+        var messageDeserializer = new RawMessageDeserializer();
         client = new ArrivalWebsocketClient(
-                new WebSocketAddress(config.apiHost(), config.apiPort()),
+                new WebSocketAddress(config.apiHost(), config.apiPort(), config.apiPath()),
+                new GsonBuilder().registerTypeAdapter(RawMessage.class, messageDeserializer).create(),
+                messageDeserializer,
                 getSLF4JLogger()
         );
+
+        apiPostman = new ApiPostman(client);
+        client.setPostman(apiPostman);
+
         client.connect();
 
         getProxy().getScheduler().schedule(
@@ -59,10 +92,18 @@ public class ArrivalPostOfficeProxy extends Plugin {
     }
 
     private void startServer(Config config) {
-        var allowedClients = new HashMap<WebSocketAddress, Integer>();
-        config.allowedMcServers().forEach(s -> allowedClients.put(s.address(), s.id()));
+        var messageDeserializer = new RawMessageDeserializer();
+        server = new ArrivalWebsocketServer(
+                config.port(),
+                new GsonBuilder().registerTypeAdapter(RawMessage.class, messageDeserializer).create(),
+                messageDeserializer,
+                getSLF4JLogger(),
+                config.allowedMcHosts()
+        );
 
-        server = new ArrivalWebsocketServer(config.port(), getSLF4JLogger(), allowedClients);
+        mcPostman = new McPostman(server);
+        server.setPostman(mcPostman);
+
         server.start();
     }
 
